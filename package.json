@@ -1,0 +1,24 @@
+{
+  "name": "moin-service-loader",
+  "description": "Adds the ability to load Services to the Moin Application Server.",
+  "keywords": [
+    "service",
+    "microservices",
+    "loader",
+    "moin"
+  ],
+  "author": "Torben Hartmann",
+  "homapage": "http://moinjs.github.io/",
+  "license": "MIT",
+  "repository": "moinjs/moin-event-system",
+  "engines": {
+    "node": ">=6.0"
+  },
+  "version": "0.0.1",
+  "moin": {
+    "type": "module"
+  },
+  "dependencies": {
+    "hat": "0.0.3"
+  }
+}
