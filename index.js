@@ -76,6 +76,9 @@ module.exports = function (moin) {
             });
     });
 
+    moin.registerMethod("getTempFolder", (subfolder = null)=>getTempFolder(moin.joinPath(".moin"), subfolder));
+
+
     let modulePath = fs.realpathSync(moin.joinPath("node_modules"));
 
     moin.registerMethod("loadService", function (servicePath) {
