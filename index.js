@@ -88,23 +88,36 @@ module.exports = function (moin) {
 
 
             let loaded = null;
-            if (typeof servicePath == "string") {
-                servicePath = moin.joinPath(servicePath);
-                loaded = moin.load(servicePath).then(service=> {
-                    if (service == null)serviceOk = false;
-                    return service;
-                });
+            if (this.getLastValue() != undefined) {
+                loaded = this.getLastValue();
             } else {
-                loaded = Promise.resolve(servicePath);
-                servicePath = servicePath.getPath();
+                if (typeof servicePath == "string") {
+                    if (!path.isAbsolute(servicePath))servicePath = moin.joinPath(servicePath);
+                    loaded = moin.load(servicePath).then(service=> {
+                        if (service == null)serviceOk = false;
+                        return service;
+                    });
+                } else {
+                    loaded = Promise.resolve(servicePath);
+                    servicePath = servicePath.getPath();
+                }
             }
-
 
             if (!serviceOk) {
                 return reject("invalid service");
             }
 
-            loaded.then(function (service) {
+            loaded.then((service)=> {
+                let ok = true;
+                return moin.emit("beforeServiceLoad", {
+                    service, cancel(){
+                        ok = false;
+                    }
+                }).then((res)=> {
+                    return ok ? service : null;
+                });
+            }).then(function (service) {
+                    if (service == null)return reject();
                     return new Promise((resolve, reject)=> {
                         fs.realpath(servicePath, function (err, realpath) {
                             if (err) {
@@ -217,8 +230,12 @@ module.exports = function (moin) {
                             log.error("parsing error in service file", path.join(servicePath, "index.js"), e);
                         });
                 })
-                .catch(function (error) {
-                    log.error("Error while loading service", error);
+                .catch(function (e) {
+                    if (typeof e == "string") {
+                        log.error("Error while loading service", e);
+                    } else {
+                        log.log(e.level, e.message);
+                    }
                     reject();
                 });
         });
