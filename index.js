@@ -53,27 +53,29 @@ module.exports = function (moin) {
         }));
     });
     moin.registerMethod("unloadService", function (id) {
-        _cache[id].unloadHandler.forEach(fnc=> {
-            try {
-                fnc();
-            } catch (e) {
-                _cache[id].api.console.error("error in unload handler:", e);
-            }
-        });
 
-        return moin.emit("unloadService", id)
-            .then(()=> {
-                log.info(`Service [${_cache[id].name}] unloaded`);
-                return new Promise((resolve)=> {
-                    fs.unlink(_cache[id].fileName, resolve);
-                })
-            }, function (e) {
-                log.error("error", e)
-            }).then(()=> {
-                delete _cache[id];
-            }).catch(function (e) {
-                log.error("error", e)
-            });
+        /* _cache[id].unloadHandler.forEach(fnc=> {
+         try {
+         fnc();
+         } catch (e) {
+         _cache[id].api.console.error("error in unload handler:", e);
+         }
+         });*/
+
+        return Promise.all(_cache[id].unloadHandler)
+            .then(moin.emit("unloadService", id)
+                .then(()=> {
+                    log.info(`Service [${_cache[id].name}] unloaded`);
+                    return new Promise((resolve)=> {
+                        fs.unlink(_cache[id].fileName, resolve);
+                    })
+                }, function (e) {
+                    log.error("error", e)
+                }).then(()=> {
+                    delete _cache[id];
+                }).catch(function (e) {
+                    log.error("error", e)
+                }));
     });
 
     moin.registerMethod("getTempFolder", (subfolder = null)=>getTempFolder(moin.joinPath(".moin"), subfolder));
@@ -117,30 +119,30 @@ module.exports = function (moin) {
                     return ok ? service : null;
                 });
             }).then(function (service) {
-                    if (service == null)return reject();
-                    return new Promise((resolve, reject)=> {
-                        fs.realpath(servicePath, function (err, realpath) {
-                            if (err) {
-                                reject("cannot get real path of service");
+                if (service == null)return reject();
+                return new Promise((resolve, reject)=> {
+                    fs.realpath(servicePath, function (err, realpath) {
+                        if (err) {
+                            reject("cannot get real path of service");
+                        } else {
+                            let base = null;
+                            //check if service path is in node_modules folder
+                            if (realpath.indexOf(modulePath) == -1) {
+                                base = moin.joinPath(".moin");
                             } else {
-                                let base = null;
-                                //check if service path is in node_modules folder
-                                if (realpath.indexOf(modulePath) == -1) {
-                                    base = moin.joinPath(".moin");
-                                } else {
-                                    base = path.join(servicePath, ".moin");
-                                }
-                                resolve({
-                                    service,
-                                    getTemp(subfolder = null){
-                                        return getTempFolder(base, subfolder);
-                                    }
-                                });
+                                base = path.join(servicePath, ".moin");
                             }
-                        });
-                    })
+                            resolve({
+                                service,
+                                getTemp(subfolder = null){
+                                    return getTempFolder(base, subfolder);
+                                }
+                            });
+                        }
+                    });
                 })
-                .then(function ({service,getTemp}) {
+            })
+                .then(function ({service, getTemp}) {
                     let id = newID();
                     log.info("Loading Service", service.getName(), " from path ", servicePath);
                     let errorHandler = [];
@@ -148,7 +150,16 @@ module.exports = function (moin) {
                     let serviceApi = {
                         moin: {
                             registerUnloadHandler(handler){
-                                _cache[id].unloadHandler.push(handler);
+                                let pr = ()=> {
+                                    return new Promise((resolve)=> {
+                                        Promise.resolve(handler())
+                                            .then(resolve, (e)=> {
+                                                _cache[id].api.console.error("error in unload handler:", e);
+                                                resolve();
+                                            });
+                                    });
+                                };
+                                _cache[id].unloadHandler.push(pr);
                             }
                         },
                         __servicename: service.getName(),
@@ -216,16 +227,16 @@ module.exports = function (moin) {
                                     });
                                 });
                         }).then(function (fileName) {
-                            let loadedService = require(fileName);
-                            _cache[id] = {
-                                api: serviceApi,
-                                name: service.getName(),
-                                unloadHandler: [],
-                                fileName
-                            };
-                            loadedService(serviceApi);
-                            resolve(id);
-                        })
+                        let loadedService = require(fileName);
+                        _cache[id] = {
+                            api: serviceApi,
+                            name: service.getName(),
+                            unloadHandler: [],
+                            fileName
+                        };
+                        loadedService(serviceApi);
+                        resolve(id);
+                    })
                         .catch(function (e) {
                             log.error("parsing error in service file", path.join(servicePath, "index.js"), e);
                         });
