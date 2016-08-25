@@ -61,7 +61,6 @@ module.exports = function (moin) {
          _cache[id].api.console.error("error in unload handler:", e);
          }
          });*/
-        console.log("unload");
         return Promise.all(_cache[id].unloadHandler.map(pr=>pr()))
             .then(()=>moin.emit("unloadService", id)
                 .then(()=> {
