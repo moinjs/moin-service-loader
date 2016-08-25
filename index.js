@@ -62,7 +62,7 @@ module.exports = function (moin) {
          }
          });*/
 
-        return Promise.all(_cache[id].unloadHandler)
+        return Promise.all(_cache[id].unloadHandler.map(pr=>pr()))
             .then(moin.emit("unloadService", id)
                 .then(()=> {
                     log.info(`Service [${_cache[id].name}] unloaded`);
